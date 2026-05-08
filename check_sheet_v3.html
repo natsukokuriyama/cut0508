@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>動画確認用カット表作成ツール v7.0 (Cloud AI)</title>
+    <style>
+        :root { --primary: #2c3e50; --accent: #e74c3c; --bg: #f0f2f5; }
+        body { font-family: 'Helvetica Neue', Arial, sans-serif; background: var(--bg); margin: 0; padding: 20px; color: #333; }
+        .container { max-width: 1300px; margin: 0 auto; }
+        header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 2px solid #ddd; padding-bottom: 10px; }
+        h1 { margin: 0; color: var(--primary); font-size: 1.4rem; }
+        
+        /* API設定エリア */
+        .settings-section { background: #2c3e50; color: white; padding: 15px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .settings-section label { font-size: 0.9rem; font-weight: bold; margin-bottom: 5px; display: block; color: #deff9a; }
+        .settings-section input { width: 100%; padding: 10px; border-radius: 4px; border: 1px solid #444; background: #1a252f; color: white; box-sizing: border-box; font-family: monospace; }
+        .settings-section p { font-size: 0.8rem; margin: 5px 0 0 0; color: #aaa; }
+
+        .upload-section { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 20px; }
+        
+        .main-layout { display: grid; grid-template-columns: 450px 1fr; gap: 20px; align-items: start; }
+        .video-sticky { position: sticky; top: 20px; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        video { width: 100%; border-radius: 4px; background: #000; min-height: 253px; display: block; }
+        
+        .controls { margin-top: 15px; display: flex; flex-direction: column; gap: 10px; }
+        button { padding: 12px; cursor: pointer; border: none; border-radius: 6px; font-weight: bold; transition: 0.2s; }
+        .btn-cap { background: var(--accent); color: white; font-size: 1rem; }
+        .btn-cap:hover { background: #c0392b; }
+        
+        .export-group { display: flex; gap: 10px; }
+        .btn-xlsx { background: #27ae60; color: white; font-size: 1rem; flex: 1; }
+        .btn-xlsx:hover { background: #219150; }
+        .btn-pptx { background: #d35400; color: white; font-size: 1rem; flex: 1; }
+        .btn-pptx:hover { background: #e67e22; }
+        .btn-del { background: #95a5a6; color: white; padding: 5px 10px; font-size: 0.75rem; }
+        .btn-del:hover { background: #7f8c8d; }
+
+        table { width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        th { background: var(--primary); color: white; padding: 12px; text-align: left; font-size: 0.85rem; }
+        td { border-bottom: 1px solid #eee; padding: 10px; vertical-align: middle; }
+        
+        .thumb-wrap canvas { width: 180px; height: auto; border: 1px solid #ddd; border-radius: 4px; display: block; background: #000; }
+        .time-code { font-family: 'Courier New', Courier, monospace; font-weight: bold; color: var(--accent); font-size: 1rem; }
+        
+        .input-group { display: flex; flex-direction: column; gap: 8px; }
+        textarea { width: 100%; height: 60px; border: 1px solid #ddd; border-radius: 4px; padding: 8px; box-sizing: border-box; resize: vertical; font-size: 0.9rem; }
+        textarea.dialogue-input { border-left: 4px solid #3498db; } 
+        textarea.telop-input { border-left: 4px solid #27ae60; } 
+        textarea.ocr-loading { background-color: #f8fff8; color: #27ae60; font-weight: bold; animation: pulse 1.5s infinite; }
+        
+        @keyframes pulse { 0% { opacity: 0.6; } 50% { opacity: 1; } 100% { opacity: 0.6; } }
+        .no-data { text-align: center; padding: 50px; color: #999; background: white; border-radius: 8px; }
+        #status { font-size: 0.85rem; font-weight: bold; margin-top: 10px; text-align: center; padding: 8px; border-radius: 4px; line-height: 1.4; }
+        .status-loading { background: #f39c12; color: white; }
+        .status-success { background: #27ae60; color: white; }
+        .status-error { background: #e74c3c; color: white; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>🎬 動画確認用カット表作成ツール <span style="font-size: 0.8rem; color: #7f8c8d;">v7.0 (Cloud AI 連携版)</span></h1>
+    </header>
+    
+    <div class="settings-section">
+        <label>🔑 OpenAI APIキー</label>
+        <input type="password" id="apiKey" placeholder="sk-..." onchange="saveApiKey()">
+        <p>※キーはブラウザ内にのみ保存されます。入力がない場合は手動入力ツールとして機能します（テロップ自動抽出はスキップ）。</p>
+    </div>
+
+    <div class="upload-section">
+        <input type="file" id="videoFile" accept="video/mp4,video/x-m4v,video/*">
+    </div>
+
+    <div class="main-layout">
+        <div class="video-sticky">
+            <video id="player" controls playsinline muted preload="auto"></video>
+            <div id="status">動画を選択してください</div>
+            <div class="controls">
+                <button class="btn-cap" onclick="captureFrame()">📸 シーンをカット登録</button>
+                <div class="export-group">
+                    <button class="btn-xlsx" onclick="exportToExcel()">Excel 📥</button>
+                    <button class="btn-pptx" onclick="exportToPPTX()">PowerPoint 📥</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="list-section" id="listContainer">
+            <div id="emptyMsg" class="no-data">動画を再生して「カット登録」ボタンを押すと<br>ここにリストが作成されます</div>
+            <table id="cutTable" style="display:none;">
+                <thead>
+                    <tr>
+                        <th style="width: 50px;">No.</th>
+                        <th style="width: 100px;">タイム</th>
+                        <th style="width: 200px;">画像</th>
+                        <th>セリフ / テロップ</th>
+                        <th style="width: 60px;">操作</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<canvas id="hiddenCanvas" style="display:none;"></canvas>
+
+<script>
+    // --- 🔑 APIキーの保存と読み込み ---
+    window.onload = () => {
+        const savedKey = localStorage.getItem('openai_api_key');
+        if(savedKey) document.getElementById('apiKey').value = savedKey;
+    };
+
+    function saveApiKey() {
+        const key = document.getElementById('apiKey').value.trim();
+        localStorage.setItem('openai_api_key', key);
+    }
+
+    const video = document.getElementById('player');
+    const tableBody = document.getElementById('tableBody');
+    const cutTable = document.getElementById('cutTable');
+    const emptyMsg = document.getElementById('emptyMsg');
+    const statusEl = document.getElementById('status');
+    const canvas = document.getElementById('hiddenCanvas');
+    const ctx = canvas.getContext('2d');
+    
+    let cutData = [];
+    let currentObjectUrl = null;
+
+    const CDNS = {
+        exceljs: [
+            "https://cdn.jsdelivr.net/npm/exceljs@4.3.0/dist/exceljs.min.js",
+            "https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"
+        ],
+        pptxgenjs: [
+            "https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js",
+            "https://cdnjs.cloudflare.com/ajax/libs/pptxgenjs/3.12.0/pptxgen.bundle.js"
+        ]
+    };
+
+    async function loadLibrary(name, urls, globalVar) {
+        if (window[globalVar]) return true;
+        for (const url of urls) {
+            try {
+                await new Promise((resolve, reject) => {
+                    const script = document.createElement('script');
+                    script.src = url; script.onload = resolve; script.onerror = reject;
+                    document.head.appendChild(script);
+                });
+                return true; 
+            } catch (e) { console.warn(`${url} がブロックされました。`); }
+        }
+        throw new Error("セキュリティブロック");
+    }
+
+    // --- 動画読み込み ---
+    document.getElementById('videoFile').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        if (currentObjectUrl) { URL.revokeObjectURL(currentObjectUrl); video.src = ""; }
+        statusEl.className = "status-loading";
+        statusEl.innerText = "動画を読み込み中... ⏳";
+        try {
+            currentObjectUrl = URL.createObjectURL(file);
+            video.src = currentObjectUrl; video.load(); 
+        } catch (err) {
+            statusEl.className = "status-error"; statusEl.innerText = "❌ エラーが発生しました。";
+        }
+    });
+
+    video.addEventListener('loadedmetadata', () => {
+        statusEl.className = "status-loading"; statusEl.innerText = "✅ 描画準備中です... ⏳";
+        video.currentTime = 0.001; 
+    });
+
+    video.addEventListener('canplay', () => {
+        statusEl.className = "status-success"; statusEl.innerText = "✅ 読み込み完了！再生可能です。";
+    });
+
+    video.addEventListener('error', () => {
+        const err = video.error;
+        let errMsg = "❌ 再生エラーが発生しました。";
+        if (err) {
+            switch (err.code) {
+                case 1: errMsg = "❌ 読み込みが中断されました。再度ファイルを選択してください。"; break;
+                case 2: errMsg = "❌ ネットワークの問題で読み込みに失敗しました。"; break;
+                case 3: errMsg = "❌ 動画データのデコードに失敗しました。"; break;
+                case 4: errMsg = "❌ ブラウザ非対応の形式です。MP4に変換してお試しください。"; break;
+            }
+        }
+        statusEl.className = "status-error";
+        statusEl.innerHTML = errMsg;
+    });
+
+    // --- キャプチャとAI呼び出し ---
+    function captureFrame() {
+        if (!video.src || video.readyState === 0) return alert("動画が正しく読み込まれていません。");
+        emptyMsg.style.display = 'none'; cutTable.style.display = 'table';
+
+        const timestamp = formatTime(video.currentTime);
+        canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        
+        const fullImgData = canvas.toDataURL('image/jpeg', 0.8);
+        const id = Date.now();
+        const apiKey = document.getElementById('apiKey').value.trim();
+
+        const newItem = {
+            id: id, time: timestamp, dialogue: "", 
+            telop: apiKey ? "☁️ 高精度AIが解析中..." : "", 
+            img: fullImgData, aspectRatio: video.videoHeight / video.videoWidth,
+            isOcrRunning: !!apiKey 
+        };
+        
+        cutData.push(newItem);
+        renderTable();
+
+        if (apiKey) {
+            runCloudAI(id, fullImgData, apiKey);
+        }
+    }
+
+    // --- ☁️ 超高精度 Cloud AI (OpenAI API) 処理 ---
+    async function runCloudAI(id, base64Image, apiKey) {
+        try {
+            const prompt = `あなたはプロの映像アシスタントです。画像に写っている「テロップ（文字）」のみを正確に抽出してください。背景の描写や、文字以外の説明は一切不要です。文字がない場合は何も出力しないでください。`;
+
+            const response = await fetch('https://api.openai.com/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${apiKey}`
+                },
+                body: JSON.stringify({
+                    model: "gpt-4o-mini", // コストパフォーマンス最強の最新モデル
+                    messages: [
+                        {
+                            role: "user",
+                            content: [
+                                { type: "text", text: prompt },
+                                { type: "image_url", image_url: { url: base64Image } }
+                            ]
+                        }
+                    ],
+                    max_tokens: 300
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error(`API Error: ${response.status}`);
+            }
+
+            const data = await response.json();
+            let extractedText = data.choices[0].message.content.trim();
+
+            const item = cutData.find(d => d.id === id);
+            if (item) {
+                item.telop = extractedText || "（テロップなし）";
+                item.isOcrRunning = false;
+                renderTable(); 
+            }
+        } catch (err) {
+            console.error(err);
+            const item = cutData.find(d => d.id === id);
+            if (item) {
+                item.telop = "⚠️ AI通信エラー（APIキーを確認してください）";
+                item.isOcrRunning = false;
+                renderTable();
+            }
+        }
+    }
+
+    function renderTable() {
+        tableBody.innerHTML = "";
+        cutData.forEach((item, index) => {
+            const row = document.createElement('tr');
+            const telopClass = item.isOcrRunning ? "telop-input ocr-loading" : "telop-input";
+            
+            row.innerHTML = `
+                <td>${index + 1}</td>
+                <td class="time-code">${item.time}</td>
+                <td class="thumb-wrap"><canvas id="thumb-${item.id}"></canvas></td>
+                <td>
+                    <div class="input-group">
+                        <textarea class="dialogue-input" placeholder="セリフを入力" oninput="updateText(${item.id}, 'dialogue', this.value)">${item.dialogue}</textarea>
+                        <textarea class="${telopClass}" placeholder="テロップを入力" oninput="updateText(${item.id}, 'telop', this.value)" ${item.isOcrRunning ? 'readonly' : ''}>${item.telop}</textarea>
+                    </div>
+                </td>
+                <td><button class="btn-del" onclick="deleteCut(${item.id})">削除</button></td>
+            `;
+            tableBody.appendChild(row);
+
+            const thumbCanvas = document.getElementById(`thumb-${item.id}`);
+            const tCtx = thumbCanvas.getContext('2d');
+            const img = new Image();
+            img.onload = () => {
+                thumbCanvas.width = 180; thumbCanvas.height = 180 * item.aspectRatio;
+                tCtx.drawImage(img, 0, 0, thumbCanvas.width, thumbCanvas.height);
+            };
+            img.src = item.img;
+        });
+    }
+
+    function deleteCut(id) {
+        if(!confirm("削除してもよろしいですか？")) return;
+        cutData = cutData.filter(d => d.id !== id); renderTable();
+    }
+
+    function updateText(id, field, val) {
+        const item = cutData.find(d => d.id === id); if (item) item[field] = val;
+    }
+
+    function formatTime(seconds) {
+        const m = Math.floor(seconds / 60); const s = Math.floor(seconds % 60); const f = Math.floor((seconds % 1) * 30); 
+        return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}:${String(f).padStart(2,'0')}`;
+    }
+
+    // --- Excel出力 ---
+    async function exportToExcel() {
+        if (cutData.length === 0) return alert("カットがありません");
+        statusEl.className = "status-loading"; statusEl.innerText = "Excel準備中... ⏳";
+        try { await loadLibrary("ExcelJS", CDNS.exceljs, "ExcelJS"); } catch (err) { return alert("読み込みエラー"); }
+
+        const workbook = new ExcelJS.Workbook(); const worksheet = workbook.addWorksheet('カット表');
+        worksheet.columns = [
+            { header: 'No.', key: 'no', width: 8 }, { header: 'タイム', key: 'time', width: 12 },
+            { header: '画像', key: 'img', width: 30 }, { header: 'セリフ', key: 'dialogue', width: 45 }, { header: 'テロップ', key: 'telop', width: 45 },
+        ];
+        worksheet.getRow(1).font = { bold: true }; worksheet.getRow(1).alignment = { vertical: 'middle', horizontal: 'center' };
+
+        for (let i = 0; i < cutData.length; i++) {
+            const item = cutData[i]; const rowIndex = i + 2; const row =
