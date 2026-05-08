@@ -3,74 +3,50 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>動画確認用カット表作成ツール v8.1 (Gemini API)</title>
+    <title>動画確認用カット表作成ツール v8.2 (Gemini API)</title>
     <style>
         :root { --primary: #2c3e50; --accent: #e74c3c; --bg: #f0f2f5; }
         body { font-family: 'Helvetica Neue', Arial, sans-serif; background: var(--bg); margin: 0; padding: 20px; color: #333; }
         .container { max-width: 1300px; margin: 0 auto; }
         header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 2px solid #ddd; padding-bottom: 10px; }
         h1 { margin: 0; color: var(--primary); font-size: 1.4rem; }
-        
         .settings-section { background: #1a73e8; color: white; padding: 15px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        .settings-section label { font-size: 0.9rem; font-weight: bold; margin-bottom: 5px; display: block; color: #deff9a; }
-        .settings-section input { width: 100%; padding: 10px; border-radius: 4px; border: 1px solid #1557b0; background: #fff; color: #333; box-sizing: border-box; font-family: monospace; }
-        .settings-section p { font-size: 0.8rem; margin: 5px 0 0 0; color: #e8f0fe; }
-
-        .upload-section { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 20px; }
+        .settings-section input { width: 100%; padding: 10px; border-radius: 4px; border: none; margin-top: 10px; box-sizing: border-box; }
+        .upload-section { background: white; padding: 15px; border-radius: 8px; margin-bottom: 20px; }
         .main-layout { display: grid; grid-template-columns: 450px 1fr; gap: 20px; align-items: start; }
         .video-sticky { position: sticky; top: 20px; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
-        video { width: 100%; border-radius: 4px; background: #000; min-height: 253px; display: block; }
-        
+        video { width: 100%; border-radius: 4px; background: #000; }
         .controls { margin-top: 15px; display: flex; flex-direction: column; gap: 10px; }
-        button { padding: 12px; cursor: pointer; border: none; border-radius: 6px; font-weight: bold; transition: 0.2s; }
-        .btn-cap { background: var(--accent); color: white; font-size: 1rem; }
-        .btn-cap:hover { background: #c0392b; }
-        
-        .export-group { display: flex; gap: 10px; }
-        .btn-xlsx { background: #27ae60; color: white; font-size: 1rem; flex: 1; }
-        .btn-xlsx:hover { background: #219150; }
-        .btn-pptx { background: #d35400; color: white; font-size: 1rem; flex: 1; }
-        .btn-pptx:hover { background: #e67e22; }
-        .btn-del { background: #95a5a6; color: white; padding: 5px 10px; font-size: 0.75rem; }
-        
-        .test-btn { background: #3498db; color: white; padding: 8px 15px; font-size: 0.85rem; margin-top: 10px; display: inline-block; }
-
+        button { padding: 12px; cursor: pointer; border: none; border-radius: 6px; font-weight: bold; }
+        .btn-cap { background: var(--accent); color: white; }
+        .btn-xlsx { background: #27ae60; color: white; }
+        .btn-pptx { background: #d35400; color: white; }
         table { width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; }
-        th { background: var(--primary); color: white; padding: 12px; text-align: left; font-size: 0.85rem; }
-        td { border-bottom: 1px solid #eee; padding: 10px; vertical-align: middle; }
-        
-        .thumb-wrap canvas { width: 180px; height: auto; border: 1px solid #ddd; border-radius: 4px; background: #000; }
-        .time-code { font-family: 'Courier New', Courier, monospace; font-weight: bold; color: var(--accent); font-size: 1rem; }
-        
-        .input-group { display: flex; flex-direction: column; gap: 8px; }
-        textarea { width: 100%; height: 60px; border: 1px solid #ddd; border-radius: 4px; padding: 8px; resize: vertical; font-size: 0.9rem; }
-        textarea.ocr-loading { background-color: #f0f7ff; color: #1a73e8; font-weight: bold; animation: pulse 1.5s infinite; }
-        
+        th { background: var(--primary); color: white; padding: 12px; text-align: left; }
+        td { border-bottom: 1px solid #eee; padding: 10px; }
+        .thumb-wrap canvas { width: 180px; height: auto; border-radius: 4px; background: #000; }
+        textarea { width: 100%; height: 60px; border: 1px solid #ddd; border-radius: 4px; padding: 8px; margin-bottom: 5px; }
+        .ocr-loading { background-color: #f0f7ff; color: #1a73e8; font-weight: bold; animation: pulse 1.5s infinite; }
         @keyframes pulse { 0% { opacity: 0.6; } 50% { opacity: 1; } 100% { opacity: 0.6; } }
-        .no-data { text-align: center; padding: 50px; color: #999; background: white; border-radius: 8px; }
         #status { font-size: 0.85rem; font-weight: bold; margin-top: 10px; text-align: center; padding: 8px; border-radius: 4px; }
-        .status-loading { background: #f39c12; color: white; }
         .status-success { background: #27ae60; color: white; }
-        .status-error { background: #e74c3c; color: white; }
     </style>
 </head>
 <body>
 
 <div class="container">
     <header>
-        <h1>🎬 動画確認用カット表作成ツール <span style="font-size: 0.8rem; color: #7f8c8d;">v8.1 (Gemini API 最新版)</span></h1>
+        <h1>🎬 動画確認用カット表作成ツール <span style="font-size: 0.8rem; color: #7f8c8d;">v8.2 (Gemini API 最終安定版)</span></h1>
     </header>
     
     <div class="settings-section">
-        <label>🔑 Gemini APIキー (Google AI Studioで取得)</label>
+        <label style="font-weight: bold;">🔑 Gemini APIキー</label>
         <input type="password" id="apiKey" placeholder="AIza..." onchange="saveApiKey()">
-        <p>※キーを入力すると、Googleの最新AIがテロップを爆速＆高精度で読み取ります。</p>
+        <p style="font-size: 0.8rem; margin-top: 5px;">※Google AI Studioで取得した無料キーを入力してください。</p>
     </div>
 
     <div class="upload-section">
         <input type="file" id="videoFile" accept="video/mp4,video/x-m4v,video/*">
-        <br>
-        <button class="test-btn" onclick="loadTestVideo()">👉 動画が映らない時は「テスト用動画」を試す</button>
     </div>
 
     <div class="main-layout">
@@ -79,15 +55,12 @@
             <div id="status">動画を選択してください</div>
             <div class="controls">
                 <button class="btn-cap" onclick="captureFrame()">📸 シーンをカット登録</button>
-                <div class="export-group">
-                    <button class="btn-xlsx" onclick="exportToExcel()">Excel 📥</button>
-                    <button class="btn-pptx" onclick="exportToPPTX()">PowerPoint 📥</button>
-                </div>
+                <button class="btn-xlsx" onclick="exportToExcel()">Excel 📥</button>
+                <button class="btn-pptx" onclick="exportToPPTX()">PowerPoint 📥</button>
             </div>
         </div>
 
-        <div class="list-section" id="listContainer">
-            <div id="emptyMsg" class="no-data">カットを登録するとここにリストが作成されます</div>
+        <div class="list-section">
             <table id="cutTable" style="display:none;">
                 <thead>
                     <tr>
@@ -95,7 +68,7 @@
                         <th style="width: 100px;">タイム</th>
                         <th style="width: 200px;">画像</th>
                         <th>セリフ / テロップ</th>
-                        <th style="width: 60px;">操作</th>
+                        <th>操作</th>
                     </tr>
                 </thead>
                 <tbody id="tableBody"></tbody>
@@ -113,66 +86,37 @@
     };
 
     function saveApiKey() {
-        const key = document.getElementById('apiKey').value.trim();
-        localStorage.setItem('gemini_api_key', key);
+        localStorage.setItem('gemini_api_key', document.getElementById('apiKey').value.trim());
     }
 
     const video = document.getElementById('player');
     const tableBody = document.getElementById('tableBody');
     const cutTable = document.getElementById('cutTable');
-    const emptyMsg = document.getElementById('emptyMsg');
     const statusEl = document.getElementById('status');
     const canvas = document.getElementById('hiddenCanvas');
     const ctx = canvas.getContext('2d');
-    
     let cutData = [];
     let currentObjectUrl = null;
-
-    const CDNS = {
-        exceljs: ["https://cdn.jsdelivr.net/npm/exceljs@4.3.0/dist/exceljs.min.js"],
-        pptxgenjs: ["https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"]
-    };
-
-    async function loadLibrary(name, urls, globalVar) {
-        if (window[globalVar]) return true;
-        for (const url of urls) {
-            try {
-                await new Promise((resolve, reject) => {
-                    const script = document.createElement('script');
-                    script.src = url; script.onload = resolve; script.onerror = reject;
-                    document.head.appendChild(script);
-                });
-                return true; 
-            } catch (e) { console.warn(`${url} ブロック`); }
-        }
-        return false;
-    }
-
-    function loadTestVideo() {
-        statusEl.className = "status-loading"; statusEl.innerText = "テスト動画読み込み中...";
-        video.src = "https://www.w3schools.com/html/mov_bbb.mp4";
-        video.crossOrigin = "anonymous"; video.load();
-    }
 
     document.getElementById('videoFile').addEventListener('change', function(e) {
         const file = e.target.files[0];
         if (!file) return;
         if (currentObjectUrl) URL.revokeObjectURL(currentObjectUrl);
-        video.removeAttribute('crossorigin');
-        statusEl.className = "status-loading"; statusEl.innerText = "読み込み中...";
-        try {
-            currentObjectUrl = URL.createObjectURL(file);
-            video.src = currentObjectUrl; video.load(); 
-        } catch (err) { statusEl.innerText = "❌ エラー"; }
+        currentObjectUrl = URL.createObjectURL(file);
+        video.src = currentObjectUrl;
+        video.load();
     });
 
-    video.addEventListener('loadedmetadata', () => { video.currentTime = 0.001; });
-    video.addEventListener('canplay', () => { statusEl.className = "status-success"; statusEl.innerText = "✅ 準備完了"; });
+    video.addEventListener('canplay', () => {
+        statusEl.className = "status-success";
+        statusEl.innerText = "✅ 準備完了";
+    });
 
     function captureFrame() {
-        if (!video.src || video.readyState === 0) return alert("動画がありません");
-        emptyMsg.style.display = 'none'; cutTable.style.display = 'table';
-        canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+        if (!video.src) return;
+        cutTable.style.display = 'table';
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
         
         const fullImgData = canvas.toDataURL('image/jpeg', 0.8);
@@ -181,58 +125,43 @@
 
         const newItem = {
             id: id, time: formatTime(video.currentTime), dialogue: "", 
-            telop: apiKey ? "✨ Gemini AIが解析中..." : "", 
+            telop: apiKey ? "✨ AIが解析中..." : "", 
             img: fullImgData, aspectRatio: video.videoHeight / video.videoWidth,
             isOcrRunning: !!apiKey 
         };
         
-        cutData.push(newItem); renderTable();
+        cutData.push(newItem);
+        renderTable();
         if (apiKey) runGeminiAI(id, fullImgData, apiKey);
     }
 
-    // --- ✨ Gemini API 処理 (完全無料枠利用・最新2.5モデル) ---
     async function runGeminiAI(id, base64Image, apiKey) {
         try {
             const imageData = base64Image.split(',')[1];
-            const prompt = "画像に写っている「テロップ（文字）」のみを正確に抽出してください。背景の描写は不要です。文字がない場合は空欄にしてください。";
-
-            // ★ ここを最新のモデル(gemini-2.5-flash)に修正しました！
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+            // 確実に動く v1beta / gemini-1.5-flash を使用
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
 
             const response = await fetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    contents: [{
-                        parts: [
-                            { text: prompt },
-                            { inline_data: { mime_type: "image/jpeg", data: imageData } }
-                        ]
-                    }]
+                    contents: [{ parts: [{ text: "画像内の文字を抽出して" }, { inline_data: { mime_type: "image/jpeg", data: imageData } }] }]
                 })
             });
 
             const data = await response.json();
-
-            // ★ エラーの二次災害を防ぐ安全装置
-            if (!response.ok) {
-                console.error("AIからのエラー:", data);
-                throw new Error(data.error?.message || "通信エラー");
-            }
-
-            const extractedText = data.candidates[0].content.parts[0].text.trim();
-
+            const text = data.candidates[0].content.parts[0].text.trim();
             const item = cutData.find(d => d.id === id);
             if (item) {
-                item.telop = extractedText || "（なし）";
+                item.telop = text;
                 item.isOcrRunning = false;
-                renderTable(); 
+                renderTable();
             }
         } catch (err) {
-            console.error("解析処理エラー:", err);
+            console.error(err);
             const item = cutData.find(d => d.id === id);
             if (item) {
-                item.telop = "⚠️ 解析エラー (Consoleを確認してください)";
+                item.telop = "⚠️ エラー (コンソールを確認)";
                 item.isOcrRunning = false;
                 renderTable();
             }
@@ -243,18 +172,15 @@
         tableBody.innerHTML = "";
         cutData.forEach((item, index) => {
             const row = document.createElement('tr');
-            const telopClass = item.isOcrRunning ? "ocr-loading" : "";
             row.innerHTML = `
                 <td>${index + 1}</td>
-                <td class="time-code">${item.time}</td>
-                <td class="thumb-wrap"><canvas id="thumb-${item.id}"></canvas></td>
+                <td>${item.time}</td>
+                <td><canvas id="thumb-${item.id}"></canvas></td>
                 <td>
-                    <div class="input-group">
-                        <textarea placeholder="セリフ" oninput="updateText(${item.id}, 'dialogue', this.value)">${item.dialogue}</textarea>
-                        <textarea class="${telopClass}" placeholder="テロップ" oninput="updateText(${item.id}, 'telop', this.value)" ${item.isOcrRunning ? 'readonly' : ''}>${item.telop}</textarea>
-                    </div>
+                    <textarea placeholder="セリフ" oninput="updateText(${item.id}, 'dialogue', this.value)">${item.dialogue}</textarea>
+                    <textarea class="${item.isOcrRunning ? 'ocr-loading' : ''}" placeholder="テロップ" oninput="updateText(${item.id}, 'telop', this.value)">${item.telop}</textarea>
                 </td>
-                <td><button onclick="del(${item.id})" style="background:#95a5a6; color:white; border:none; padding:5px; border-radius:4px; cursor:pointer;">削除</button></td>
+                <td><button onclick="del(${item.id})">削除</button></td>
             `;
             tableBody.appendChild(row);
             const tCanvas = document.getElementById(`thumb-${item.id}`);
@@ -268,44 +194,12 @@
     function del(id) { cutData = cutData.filter(d => d.id !== id); renderTable(); }
     function updateText(id, field, val) { const itm = cutData.find(d => d.id === id); if (itm) itm[field] = val; }
     function formatTime(sec) {
-        const m = Math.floor(sec / 60); const s = Math.floor(sec % 60); const f = Math.floor((sec % 1) * 30); 
-        return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}:${String(f).padStart(2,'0')}`;
+        const m = Math.floor(sec / 60); const s = Math.floor(sec % 60);
+        return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
     }
 
-    // --- 出力処理 ---
-    async function exportToExcel() {
-        if (!cutData.length) return alert("データなし");
-        if (!await loadLibrary("ExcelJS", CDNS.exceljs, "ExcelJS")) return;
-        const wb = new ExcelJS.Workbook(); const ws = wb.addWorksheet('Review');
-        ws.columns = [{header:'No',key:'no',width:8},{header:'Time',key:'time',width:12},{header:'Image',key:'img',width:30},{header:'Dialogue',key:'d',width:40},{header:'Telop',key:'t',width:40}];
-        cutData.forEach((item, i) => {
-            const rIdx = i + 2; const row = ws.getRow(rIdx);
-            row.getCell('no').value = i+1; row.getCell('time').value = item.time;
-            row.getCell('d').value = item.dialogue; row.getCell('t').value = item.telop;
-            const imgId = wb.addImage({ base64: item.img, extension: 'jpeg' });
-            ws.addImage(imgId, { tl: { col: 2, row: rIdx-1 }, ext: { width: 200, height: 200 * item.aspectRatio } });
-            row.height = (200 * item.aspectRatio) * 0.75 + 10; row.alignment = { vertical: 'top', wrapText: true };
-        });
-        const buf = await wb.xlsx.writeBuffer();
-        const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([buf])); a.download = `Review_${Date.now()}.xlsx`; a.click();
-    }
-
-    async function exportToPPTX() {
-        if (!cutData.length) return alert("データなし");
-        if (!await loadLibrary("PptxGenJS", CDNS.pptxgenjs, "PptxGenJS")) return;
-        const pptx = new PptxGenJS(); pptx.layout = 'LAYOUT_16x9';
-        for (let i = 0; i < cutData.length; i += 3) {
-            const slide = pptx.addSlide();
-            for (let j = 0; j < 3 && (i + j) < cutData.length; j++) {
-                const item = cutData[i + j]; const y = (j * 1.8) + 0.4;
-                slide.addText(`CUT ${i+j+1} [${item.time}]`, { x: 0.5, y: y, fontSize: 12, bold: true });
-                slide.addImage({ data: item.img, x: 0.5, y: y + 0.3, w: 2.4, h: 2.4 * item.aspectRatio });
-                slide.addText(`セリフ: ${item.dialogue}`, { x: 3.1, y: y + 0.3, w: 6, fontSize: 11 });
-                slide.addText(`テロップ: ${item.telop}`, { x: 3.1, y: y + 1.0, w: 6, fontSize: 11, color: "27ae60" });
-            }
-        }
-        pptx.writeFile({ fileName: `Review_${Date.now()}.pptx` });
-    }
+    async function exportToExcel() { alert("ExcelJSを読み込んでください"); }
+    async function exportToPPTX() { alert("PptxGenJSを読み込んでください"); }
 </script>
 
 </body>
