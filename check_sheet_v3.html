@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>動画確認用カット表作成ツール v7.1</title>
+    <title>動画確認用カット表作成ツール v7.2</title>
     <style>
         :root { --primary: #2c3e50; --accent: #e74c3c; --bg: #f0f2f5; }
         body { font-family: 'Helvetica Neue', Arial, sans-serif; background: var(--bg); margin: 0; padding: 20px; color: #333; }
@@ -29,4 +29,72 @@
         .btn-cap:hover { background: #c0392b; }
         
         .export-group { display: flex; gap: 10px; }
-        .btn-xlsx { background: #27ae60; color: white; font
+        .btn-xlsx { background: #27ae60; color: white; font-size: 1rem; flex: 1; }
+        .btn-xlsx:hover { background: #219150; }
+        .btn-pptx { background: #d35400; color: white; font-size: 1rem; flex: 1; }
+        .btn-pptx:hover { background: #e67e22; }
+        .btn-del { background: #95a5a6; color: white; padding: 5px 10px; font-size: 0.75rem; }
+        .btn-del:hover { background: #7f8c8d; }
+
+        .test-btn { background: #3498db; color: white; padding: 8px 15px; font-size: 0.85rem; margin-top: 10px; display: inline-block; }
+        .test-btn:hover { background: #2980b9; }
+
+        table { width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        th { background: var(--primary); color: white; padding: 12px; text-align: left; font-size: 0.85rem; }
+        td { border-bottom: 1px solid #eee; padding: 10px; vertical-align: middle; }
+        
+        .thumb-wrap canvas { width: 180px; height: auto; border: 1px solid #ddd; border-radius: 4px; display: block; background: #000; }
+        .time-code { font-family: 'Courier New', Courier, monospace; font-weight: bold; color: var(--accent); font-size: 1rem; }
+        
+        .input-group { display: flex; flex-direction: column; gap: 8px; }
+        textarea { width: 100%; height: 60px; border: 1px solid #ddd; border-radius: 4px; padding: 8px; box-sizing: border-box; resize: vertical; font-size: 0.9rem; }
+        textarea.dialogue-input { border-left: 4px solid #3498db; } 
+        textarea.telop-input { border-left: 4px solid #27ae60; } 
+        textarea.ocr-loading { background-color: #f8fff8; color: #27ae60; font-weight: bold; animation: pulse 1.5s infinite; }
+        
+        @keyframes pulse { 0% { opacity: 0.6; } 50% { opacity: 1; } 100% { opacity: 0.6; } }
+        .no-data { text-align: center; padding: 50px; color: #999; background: white; border-radius: 8px; }
+        #status { font-size: 0.85rem; font-weight: bold; margin-top: 10px; text-align: center; padding: 8px; border-radius: 4px; line-height: 1.4; }
+        .status-loading { background: #f39c12; color: white; }
+        .status-success { background: #27ae60; color: white; }
+        .status-error { background: #e74c3c; color: white; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>🎬 動画確認用カット表作成ツール <span style="font-size: 0.8rem; color: #7f8c8d;">v7.2 (最終安定版)</span></h1>
+    </header>
+    
+    <div class="settings-section">
+        <label>🔑 OpenAI APIキー (任意)</label>
+        <input type="password" id="apiKey" placeholder="sk-..." onchange="saveApiKey()">
+        <p>※入力がない場合は手動入力ツールとして機能します（テロップ自動抽出はスキップ）。</p>
+    </div>
+
+    <div class="upload-section">
+        <label style="font-weight: bold; display: block; margin-bottom: 8px;">自分の動画を選択する：</label>
+        <input type="file" id="videoFile" accept="video/mp4,video/x-m4v,video/*" style="margin-bottom: 10px;">
+        <br>
+        <button class="test-btn" onclick="loadTestVideo()">👉 うまく再生できない時は「テスト用動画」を試す</button>
+        <p style="font-size: 0.75rem; color: #e74c3c; margin-top: 8px; font-weight: bold;">※iPhoneで撮影した .mov はWindowsのブラウザでは画面が真っ暗になるケースが多いです。その場合は .mp4 に変換してください。</p>
+    </div>
+
+    <div class="main-layout">
+        <div class="video-sticky">
+            <video id="player" controls playsinline muted preload="auto"></video>
+            <div id="status">動画を選択してください</div>
+            <div class="controls">
+                <button class="btn-cap" onclick="captureFrame()">📸 シーンをカット登録</button>
+                <div class="export-group">
+                    <button class="btn-xlsx" onclick="exportToExcel()">Excel 📥</button>
+                    <button class="btn-pptx" onclick="exportToPPTX()">PowerPoint 📥</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="list-section" id="listContainer">
+            <div id="emptyMsg" class="no-data">動画を再生して「カット登録」ボタンを押すと<br>ここにリストが作成されます</div>
+            <table id="cutTable" style="display:none;">
+                <thead>
