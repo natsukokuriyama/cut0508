@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>動画確認用カット表作成ツール v8.0 (Gemini API)</title>
+    <title>動画確認用カット表作成ツール v8.1 (Gemini API)</title>
     <style>
         :root { --primary: #2c3e50; --accent: #e74c3c; --bg: #f0f2f5; }
         body { font-family: 'Helvetica Neue', Arial, sans-serif; background: var(--bg); margin: 0; padding: 20px; color: #333; }
@@ -11,7 +11,6 @@
         header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 2px solid #ddd; padding-bottom: 10px; }
         h1 { margin: 0; color: var(--primary); font-size: 1.4rem; }
         
-        /* API設定エリア：Gemini用に調整 */
         .settings-section { background: #1a73e8; color: white; padding: 15px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
         .settings-section label { font-size: 0.9rem; font-weight: bold; margin-bottom: 5px; display: block; color: #deff9a; }
         .settings-section input { width: 100%; padding: 10px; border-radius: 4px; border: 1px solid #1557b0; background: #fff; color: #333; box-sizing: border-box; font-family: monospace; }
@@ -59,7 +58,7 @@
 
 <div class="container">
     <header>
-        <h1>🎬 動画確認用カット表作成ツール <span style="font-size: 0.8rem; color: #7f8c8d;">v8.0 (Gemini API・完全無料版)</span></h1>
+        <h1>🎬 動画確認用カット表作成ツール <span style="font-size: 0.8rem; color: #7f8c8d;">v8.1 (Gemini API 最新版)</span></h1>
     </header>
     
     <div class="settings-section">
@@ -191,14 +190,14 @@
         if (apiKey) runGeminiAI(id, fullImgData, apiKey);
     }
 
-    // --- ✨ Gemini API 処理 (完全無料枠利用) ---
+    // --- ✨ Gemini API 処理 (完全無料枠利用・最新2.5モデル) ---
     async function runGeminiAI(id, base64Image, apiKey) {
         try {
             const imageData = base64Image.split(',')[1];
             const prompt = "画像に写っている「テロップ（文字）」のみを正確に抽出してください。背景の描写は不要です。文字がない場合は空欄にしてください。";
 
-            // Gemini 1.5 Flash モデルを使用（高速・無料枠が広い）
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+            // ★ ここを最新のモデル(gemini-2.5-flash)に修正しました！
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
 
             const response = await fetch(url, {
                 method: 'POST',
@@ -214,6 +213,13 @@
             });
 
             const data = await response.json();
+
+            // ★ エラーの二次災害を防ぐ安全装置
+            if (!response.ok) {
+                console.error("AIからのエラー:", data);
+                throw new Error(data.error?.message || "通信エラー");
+            }
+
             const extractedText = data.candidates[0].content.parts[0].text.trim();
 
             const item = cutData.find(d => d.id === id);
@@ -223,10 +229,10 @@
                 renderTable(); 
             }
         } catch (err) {
-            console.error(err);
+            console.error("解析処理エラー:", err);
             const item = cutData.find(d => d.id === id);
             if (item) {
-                item.telop = "⚠️ 解析エラー (キーを確認)";
+                item.telop = "⚠️ 解析エラー (Consoleを確認してください)";
                 item.isOcrRunning = false;
                 renderTable();
             }
