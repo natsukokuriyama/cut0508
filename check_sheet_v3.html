@@ -274,3 +274,75 @@
             row.innerHTML = `
                 <td>${index + 1}</td>
                 <td class="time-code">${item.time}</td>
+                <td class="thumb-wrap"><canvas id="thumb-${item.id}"></canvas></td>
+                <td>
+                    <div class="input-group">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span style="font-size: 0.8rem; color: #666; font-weight: bold;">セリフ</span>
+                            <button id="btn-mic-${item.id}" onclick="toggleSpeech(${item.id})" style="background:#3498db; color:white; border:none; padding:4px 8px; border-radius:4px; font-size:0.75rem; cursor:pointer; font-weight:bold;">🎤 音声入力</button>
+                        </div>
+                        <textarea id="dialogue-${item.id}" placeholder="音声を流して入力" oninput="updateText(${item.id}, 'dialogue', this.value)">${item.dialogue}</textarea>
+                        <span style="font-size: 0.8rem; color: #666; font-weight: bold;">テロップ</span>
+                        <textarea class="${telopClass}" oninput="updateText(${item.id}, 'telop', this.value)">${item.telop}</textarea>
+                    </div>
+                </td>
+                <td><button onclick="del(${item.id})" style="background:#95a5a6; color:white; border:none; padding:5px 10px; border-radius:4px; cursor:pointer;">削除</button></td>
+            `;
+            tableBody.appendChild(row);
+            const tCanvas = document.getElementById(`thumb-${item.id}`);
+            const tCtx = tCanvas.getContext('2d');
+            const img = new Image();
+            img.onload = () => { tCanvas.width = 180; tCanvas.height = 180 * item.aspectRatio; tCtx.drawImage(img, 0, 0, 180, 180 * item.aspectRatio); };
+            img.src = item.img;
+        });
+    }
+
+    function del(id) { if(activeSpeechId === id && recognition) recognition.stop(); cutData = cutData.filter(d => d.id !== id); renderTable(); }
+    function updateText(id, field, val) { const itm = cutData.find(d => d.id === id); if (itm) itm[field] = val; }
+    function formatTime(sec) {
+        const m = Math.floor(sec / 60); const s = Math.floor(sec % 60); const f = Math.floor((sec % 1) * 30); 
+        return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}:${String(f).padStart(2,'0')}`;
+    }
+
+    async function exportToExcel() {
+        if (!cutData.length) return alert("データなし");
+        statusEl.className = "status-loading"; statusEl.innerText = "Excel出力中...";
+        if (!await loadLibrary("ExcelJS", CDNS.exceljs, "ExcelJS")) return;
+        const wb = new ExcelJS.Workbook(); const ws = wb.addWorksheet('カット表');
+        ws.columns = [{header:'No.',key:'no',width:8},{header:'タイム',key:'time',width:12},{header:'画像',key:'img',width:30},{header:'セリフ',key:'d',width:45},{header:'テロップ',key:'t',width:45}];
+        ws.getRow(1).font = { bold: true };
+        cutData.forEach((item, i) => {
+            const rIdx = i + 2; const row = ws.getRow(rIdx);
+            row.getCell('no').value = i+1; row.getCell('time').value = item.time;
+            row.getCell('d').value = item.dialogue; row.getCell('t').value = item.telop;
+            const imgId = wb.addImage({ base64: item.img, extension: 'jpeg' });
+            ws.addImage(imgId, { tl: { col: 2, row: rIdx-1 }, ext: { width: 200, height: 200 * item.aspectRatio } });
+            row.height = (200 * item.aspectRatio) * 0.75 + 10; row.alignment = { vertical: 'top', wrapText: true };
+        });
+        const buf = await wb.xlsx.writeBuffer();
+        const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([buf])); a.download = `動画カット表_${Date.now()}.xlsx`; a.click();
+        statusEl.className = "status-success"; statusEl.innerText = "✅ Excel完了";
+    }
+
+    async function exportToPPTX() {
+        if (!cutData.length) return alert("データなし");
+        statusEl.className = "status-loading"; statusEl.innerText = "PPTX出力中...";
+        if (!await loadLibrary("PptxGenJS", CDNS.pptxgenjs, "PptxGenJS")) return;
+        const pptx = new PptxGenJS(); pptx.layout = 'LAYOUT_16x9';
+        for (let i = 0; i < cutData.length; i += 3) {
+            const slide = pptx.addSlide();
+            for (let j = 0; j < 3 && (i + j) < cutData.length; j++) {
+                const item = cutData[i + j]; const y = (j * 1.8) + 0.4;
+                slide.addText(`CUT NO. ${i+j+1} [${item.time}]`, { x: 0.5, y: y, fontSize: 12, bold: true });
+                slide.addImage({ data: item.img, x: 0.5, y: y + 0.3, w: 2.4, h: 2.4 * item.aspectRatio });
+                slide.addText(`セリフ: \n${item.dialogue}`, { x: 3.1, y: y + 0.3, w: 6, h: 0.6, fontSize: 11, valign: "top" });
+                slide.addText(`テロップ: \n${item.telop}`, { x: 3.1, y: y + 1.1, w: 6, h: 0.6, fontSize: 11, color: "27ae60", valign: "top" });
+            }
+        }
+        pptx.writeFile({ fileName: `動画カット表_${Date.now()}.pptx` });
+        statusEl.className = "status-success"; statusEl.innerText = "✅ PPTX完了";
+    }
+</script>
+
+</body>
+</html>
