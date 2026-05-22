@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>動画確認用カット表作成ツール v8.5</title>
+    <title>動画確認用カット表作成ツール v8.6</title>
     <style>
         :root { --primary: #2c3e50; --accent: #e74c3c; --bg: #f0f2f5; }
         body { font-family: 'Helvetica Neue', Arial, sans-serif; background: var(--bg); margin: 0; padding: 20px; color: #333; }
@@ -53,7 +53,7 @@
 
 <div class="container">
     <header>
-        <h1>🎬 動画確認用カット表作成ツール <span style="font-size: 0.8rem; color: #7f8c8d;">v8.5 (自動ソート＆デバッグ機能付き)</span></h1>
+        <h1>🎬 動画確認用カット表作成ツール <span style="font-size: 0.8rem; color: #7f8c8d;">v8.6 (AIモデル最新版)</span></h1>
     </header>
     
     <div class="settings-section">
@@ -169,7 +169,7 @@
 
         const newItem = {
             id: id, 
-            seconds: video.currentTime, // ★秒数でソートするための隠しデータ
+            seconds: video.currentTime, // 秒数でソートするための隠しデータ
             time: formatTime(video.currentTime), 
             dialogue: "", 
             telop: apiKey ? "✨ AIが解析中..." : "", 
@@ -180,19 +180,18 @@
         };
         
         cutData.push(newItem); 
-        
-        // ★配列を秒数（早い順）に並び替える！
         cutData.sort((a, b) => a.seconds - b.seconds);
         
         renderTable();
         if (apiKey) runGeminiAI(id, fullImgData, apiKey);
     }
 
-    // --- ✨ Gemini API 処理 (エラー詳細を画面に表示) ---
+    // --- ✨ Gemini API 処理 (モデル名を最新の2.0に修正！) ---
     async function runGeminiAI(id, base64Image, apiKey) {
         try {
             const imageData = base64Image.split(',')[1];
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+            // ★ここを最新で確実な「gemini-2.0-flash」に変更しました！
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
             const response = await fetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -201,7 +200,6 @@
 
             const data = await response.json();
             
-            // API側からエラーが返ってきた場合の処理
             if (!response.ok) {
                 let errorMsg = data.error?.message || `HTTPエラー ${response.status}`;
                 throw new Error(errorMsg);
@@ -218,7 +216,6 @@
         } catch (err) {
             const item = cutData.find(d => d.id === id);
             if (item) { 
-                // ★コンソールを開かなくても、テロップ欄にエラーの本当の理由を表示する！
                 item.telop = `⚠️ エラー詳細:\n${err.message}`; 
                 item.isOcrRunning = false; 
                 item.isError = true;
@@ -266,7 +263,6 @@
         cutData.forEach((item, index) => {
             const row = document.createElement('tr');
             
-            // エラー時と読込時のスタイル分岐
             let telopClass = "";
             if (item.isOcrRunning) telopClass = "ocr-loading";
             if (item.isError) telopClass = "ocr-error";
