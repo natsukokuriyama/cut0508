@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>動画確認用カット表作成ツール v8.4 (時間順自動ソート)</title>
+    <title>動画確認用カット表作成ツール v8.5</title>
     <style>
         :root { --primary: #2c3e50; --accent: #e74c3c; --bg: #f0f2f5; }
         body { font-family: 'Helvetica Neue', Arial, sans-serif; background: var(--bg); margin: 0; padding: 20px; color: #333; }
@@ -28,9 +28,7 @@
         
         .export-group { display: flex; gap: 10px; }
         .btn-xlsx { background: #27ae60; color: white; font-size: 1rem; flex: 1; }
-        .btn-xlsx:hover { background: #219150; }
         .btn-pptx { background: #d35400; color: white; font-size: 1rem; flex: 1; }
-        .btn-pptx:hover { background: #e67e22; }
         
         table { width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; }
         th { background: var(--primary); color: white; padding: 12px; text-align: left; font-size: 0.85rem; }
@@ -42,6 +40,7 @@
         .input-group { display: flex; flex-direction: column; gap: 8px; }
         textarea { width: 100%; height: 60px; border: 1px solid #ddd; border-radius: 4px; padding: 8px; resize: vertical; font-size: 0.9rem; }
         textarea.ocr-loading { background-color: #f0f7ff; color: #1a73e8; font-weight: bold; animation: pulse 1.5s infinite; }
+        textarea.ocr-error { background-color: #fff0f0; color: #e74c3c; border-left: 4px solid #e74c3c; font-size: 0.8rem; }
         
         @keyframes pulse { 0% { opacity: 0.6; } 50% { opacity: 1; } 100% { opacity: 0.6; } }
         .no-data { text-align: center; padding: 50px; color: #999; background: white; border-radius: 8px; }
@@ -54,13 +53,12 @@
 
 <div class="container">
     <header>
-        <h1>🎬 動画確認用カット表作成ツール <span style="font-size: 0.8rem; color: #7f8c8d;">v8.4 (時間順自動整列版)</span></h1>
+        <h1>🎬 動画確認用カット表作成ツール <span style="font-size: 0.8rem; color: #7f8c8d;">v8.5 (自動ソート＆デバッグ機能付き)</span></h1>
     </header>
     
     <div class="settings-section">
         <label>🔑 Gemini APIキー</label>
         <input type="password" id="apiKey" placeholder="AIza..." onchange="saveApiKey()">
-        <p>※キーを入力すると、Googleの最新AIがテロップを爆速＆高精度で読み取ります。</p>
     </div>
 
     <div class="upload-section">
@@ -158,7 +156,7 @@
     video.addEventListener('loadedmetadata', () => { video.currentTime = 0.001; });
     video.addEventListener('canplay', () => { statusEl.className = "status-success"; statusEl.innerText = "✅ 準備完了"; });
 
-    // --- キャプチャ（★ここを時間順ソートに大改造） ---
+    // --- キャプチャ ＆ 自動並び替え ---
     function captureFrame() {
         if (!video.src || video.readyState === 0) return alert("動画がありません");
         emptyMsg.style.display = 'none'; cutTable.style.display = 'table';
@@ -171,24 +169,26 @@
 
         const newItem = {
             id: id, 
-            seconds: video.currentTime, // ★ソート用の「生データ（秒）」を新しく記憶！
+            seconds: video.currentTime, // ★秒数でソートするための隠しデータ
             time: formatTime(video.currentTime), 
             dialogue: "", 
             telop: apiKey ? "✨ AIが解析中..." : "", 
             img: fullImgData, 
             aspectRatio: video.videoHeight / video.videoWidth,
-            isOcrRunning: !!apiKey 
+            isOcrRunning: !!apiKey,
+            isError: false
         };
         
         cutData.push(newItem); 
         
-        // ★【大改造】時間を戻して追加しても、常に秒数が早い順に自動並び替え！
+        // ★配列を秒数（早い順）に並び替える！
         cutData.sort((a, b) => a.seconds - b.seconds);
         
         renderTable();
         if (apiKey) runGeminiAI(id, fullImgData, apiKey);
     }
 
+    // --- ✨ Gemini API 処理 (エラー詳細を画面に表示) ---
     async function runGeminiAI(id, base64Image, apiKey) {
         try {
             const imageData = base64Image.split(',')[1];
@@ -200,23 +200,36 @@
             });
 
             const data = await response.json();
-            if (!response.ok) throw new Error();
+            
+            // API側からエラーが返ってきた場合の処理
+            if (!response.ok) {
+                let errorMsg = data.error?.message || `HTTPエラー ${response.status}`;
+                throw new Error(errorMsg);
+            }
 
             const text = data.candidates[0].content.parts[0].text.trim();
             const item = cutData.find(d => d.id === id);
             if (item) {
-                item.telop = text || "（なし）"; item.isOcrRunning = false;
+                item.telop = text || "（文字なし）"; 
+                item.isOcrRunning = false;
+                item.isError = false;
                 renderTable(); 
             }
         } catch (err) {
             const item = cutData.find(d => d.id === id);
-            if (item) { item.telop = "⚠️ 解析エラー"; item.isOcrRunning = false; renderTable(); }
+            if (item) { 
+                // ★コンソールを開かなくても、テロップ欄にエラーの本当の理由を表示する！
+                item.telop = `⚠️ エラー詳細:\n${err.message}`; 
+                item.isOcrRunning = false; 
+                item.isError = true;
+                renderTable(); 
+            }
         }
     }
 
     // --- 🎤 音声認識 ---
     function toggleSpeech(id) {
-        if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) return alert("ブラウザ非対応");
+        if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) return alert("ブラウザ非対応です");
         const btn = document.getElementById(`btn-mic-${id}`);
         const textarea = document.getElementById(`dialogue-${id}`);
         if (activeSpeechId === id && recognition) { recognition.stop(); return; }
@@ -252,79 +265,12 @@
         tableBody.innerHTML = "";
         cutData.forEach((item, index) => {
             const row = document.createElement('tr');
+            
+            // エラー時と読込時のスタイル分岐
+            let telopClass = "";
+            if (item.isOcrRunning) telopClass = "ocr-loading";
+            if (item.isError) telopClass = "ocr-error";
+
             row.innerHTML = `
                 <td>${index + 1}</td>
                 <td class="time-code">${item.time}</td>
-                <td class="thumb-wrap"><canvas id="thumb-${item.id}"></canvas></td>
-                <td>
-                    <div class="input-group">
-                        <div style="display: flex; justify-content: space-between; align-items: center;">
-                            <span style="font-size: 0.8rem; color: #666; font-weight: bold;">セリフ</span>
-                            <button id="btn-mic-${item.id}" onclick="toggleSpeech(${item.id})" style="background:#3498db; color:white; border:none; padding:4px 8px; border-radius:4px; font-size:0.75rem; cursor:pointer; font-weight:bold;">🎤 音声入力</button>
-                        </div>
-                        <textarea id="dialogue-${item.id}" placeholder="音声を流して入力" oninput="updateText(${item.id}, 'dialogue', this.value)">${item.dialogue}</textarea>
-                        <span style="font-size: 0.8rem; color: #666; font-weight: bold;">テロップ</span>
-                        <textarea class="${item.isOcrRunning ? 'ocr-loading' : ''}" oninput="updateText(${item.id}, 'telop', this.value)">${item.telop}</textarea>
-                    </div>
-                </td>
-                <td><button onclick="del(${item.id})" style="background:#95a5a6; color:white; border:none; padding:5px 10px; border-radius:4px; cursor:pointer;">削除</button></td>
-            `;
-            tableBody.appendChild(row);
-            const tCanvas = document.getElementById(`thumb-${item.id}`);
-            const tCtx = tCanvas.getContext('2d');
-            const img = new Image();
-            img.onload = () => { tCanvas.width = 180; tCanvas.height = 180 * item.aspectRatio; tCtx.drawImage(img, 0, 0, 180, 180 * item.aspectRatio); };
-            img.src = item.img;
-        });
-    }
-
-    function del(id) { if(activeSpeechId === id && recognition) recognition.stop(); cutData = cutData.filter(d => d.id !== id); renderTable(); }
-    function updateText(id, field, val) { const itm = cutData.find(d => d.id === id); if (itm) itm[field] = val; }
-    function formatTime(sec) {
-        const m = Math.floor(sec / 60); const s = Math.floor(sec % 60); const f = Math.floor((sec % 1) * 30); 
-        return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}:${String(f).padStart(2,'0')}`;
-    }
-
-    // --- 出力処理 ---
-    async function exportToExcel() {
-        if (!cutData.length) return alert("データなし");
-        statusEl.className = "status-loading"; statusEl.innerText = "Excel出力中...";
-        if (!await loadLibrary("ExcelJS", CDNS.exceljs, "ExcelJS")) return;
-        const wb = new ExcelJS.Workbook(); const ws = wb.addWorksheet('カット表');
-        ws.columns = [{header:'No.',key:'no',width:8},{header:'タイム',key:'time',width:12},{header:'画像',key:'img',width:30},{header:'セリフ',key:'d',width:45},{header:'テロップ',key:'t',width:45}];
-        ws.getRow(1).font = { bold: true };
-        cutData.forEach((item, i) => {
-            const rIdx = i + 2; const row = ws.getRow(rIdx);
-            row.getCell('no').value = i+1; row.getCell('time').value = item.time;
-            row.getCell('d').value = item.dialogue; row.getCell('t').value = item.telop;
-            const imgId = wb.addImage({ base64: item.img, extension: 'jpeg' });
-            ws.addImage(imgId, { tl: { col: 2, row: rIdx-1 }, ext: { width: 200, height: 200 * item.aspectRatio } });
-            row.height = (200 * item.aspectRatio) * 0.75 + 10; row.alignment = { vertical: 'top', wrapText: true };
-        });
-        const buf = await wb.xlsx.writeBuffer();
-        const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([buf])); a.download = `動画カット表_${Date.now()}.xlsx`; a.click();
-        statusEl.className = "status-success"; statusEl.innerText = "✅ Excel完了";
-    }
-
-    async function exportToPPTX() {
-        if (!cutData.length) return alert("データなし");
-        statusEl.className = "status-loading"; statusEl.innerText = "PPTX出力中...";
-        if (!await loadLibrary("PptxGenJS", CDNS.pptxgenjs, "PptxGenJS")) return;
-        const pptx = new PptxGenJS(); pptx.layout = 'LAYOUT_16x9';
-        for (let i = 0; i < cutData.length; i += 3) {
-            const slide = pptx.addSlide();
-            for (let j = 0; j < 3 && (i + j) < cutData.length; j++) {
-                const item = cutData[i + j]; const y = (j * 1.8) + 0.4;
-                slide.addText(`CUT NO. ${i+j+1} [${item.time}]`, { x: 0.5, y: y, fontSize: 12, bold: true });
-                slide.addImage({ data: item.img, x: 0.5, y: y + 0.3, w: 2.4, h: 2.4 * item.aspectRatio });
-                slide.addText(`セリフ: \n${item.dialogue}`, { x: 3.1, y: y + 0.3, w: 6, h: 0.6, fontSize: 11, valign: "top" });
-                slide.addText(`テロップ: \n${item.telop}`, { x: 3.1, y: y + 1.1, w: 6, h: 0.6, fontSize: 11, color: "27ae60", valign: "top" });
-            }
-        }
-        pptx.writeFile({ fileName: `動画カット表_${Date.now()}.pptx` });
-        statusEl.className = "status-success"; statusEl.innerText = "✅ PPTX完了";
-    }
-</script>
-
-</body>
-</html>
