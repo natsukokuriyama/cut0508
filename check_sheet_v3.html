@@ -3,44 +3,51 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>動画確認用カット表作成ツール v9.0</title>
+    <title>動画確認用カット表作成ツール v9.1</title>
     <style>
         :root { --primary: #2c3e50; --accent: #e74c3c; --bg: #f0f2f5; }
-        body { font-family: 'Helvetica Neue', Arial, sans-serif; background: var(--bg); margin: 0; padding: 20px; color: #333; }
-        .container { max-width: 1300px; margin: 0 auto; }
-        header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 2px solid #ddd; padding-bottom: 10px; }
+        body { font-family: 'Helvetica Neue', Arial, sans-serif; background: var(--bg); margin: 0; padding: 20px; color: #333; height: 100vh; overflow: hidden; box-sizing: border-box; }
+        .container { max-width: 1400px; margin: 0 auto; height: 100%; display: flex; flex-direction: column; }
+        header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 2px solid #ddd; padding-bottom: 10px; flex-shrink: 0; }
         h1 { margin: 0; color: var(--primary); font-size: 1.4rem; }
         
-        .settings-section { background: #1a73e8; color: white; padding: 15px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        .settings-section label { font-size: 0.9rem; font-weight: bold; margin-bottom: 5px; display: block; color: #deff9a; }
-        .settings-section input { width: 100%; padding: 10px; border-radius: 4px; border: 1px solid #1557b0; background: #fff; color: #333; box-sizing: border-box; font-family: monospace; }
-        .settings-section p { font-size: 0.8rem; margin: 5px 0 0 0; color: #e8f0fe; }
-
-        .upload-section { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 20px; }
-        .main-layout { display: grid; grid-template-columns: 450px 1fr; gap: 20px; align-items: start; }
-        .video-sticky { position: sticky; top: 20px; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
-        video { width: 100%; border-radius: 4px; background: #000; min-height: 253px; display: block; }
+        .settings-section { background: #1a73e8; color: white; padding: 10px 15px; border-radius: 8px; margin-bottom: 15px; flex-shrink: 0; display: flex; gap: 15px; align-items: center; }
+        .settings-section label { font-size: 0.9rem; font-weight: bold; color: #deff9a; white-space: nowrap; }
+        .settings-section input { flex: 1; padding: 8px; border-radius: 4px; border: none; font-family: monospace; }
+        
+        .upload-section { background: white; padding: 10px 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 15px; flex-shrink: 0; }
+        
+        .main-layout { display: flex; gap: 20px; align-items: stretch; flex: 1; min-height: 0; /* これが重要：子要素のスクロールを許可する */ }
+        
+        /* ★左側：ビデオ固定エリア（縦型動画の暴走を防ぐ） */
+        .video-sticky { flex: 0 0 450px; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); display: flex; flex-direction: column; }
+        video { width: 100%; max-height: 35vh; object-fit: contain; background: #000; border-radius: 4px; display: block; flex-shrink: 0; }
         
         .controls { margin-top: 15px; display: flex; flex-direction: column; gap: 10px; }
         button { padding: 12px; cursor: pointer; border: none; border-radius: 6px; font-weight: bold; transition: 0.2s; }
         .btn-cap { background: var(--accent); color: white; font-size: 1rem; }
         .btn-cap:hover { background: #c0392b; }
-        
         .export-group { display: flex; gap: 10px; }
         .btn-xlsx { background: #27ae60; color: white; font-size: 1rem; flex: 1; }
         .btn-pptx { background: #d35400; color: white; font-size: 1rem; flex: 1; }
         
-        /* 最新プレビュー用スタイル */
-        .latest-preview { margin-top: 15px; padding: 12px; border: 2px solid #3498db; border-radius: 8px; background: #f0f7ff; display: none; }
-        .latest-preview-title { font-size: 0.85rem; font-weight: bold; color: #2980b9; margin-bottom: 8px; }
-        .latest-preview img { width: 100%; border-radius: 4px; margin-bottom: 8px; border: 1px solid #bdc3c7; }
-        .latest-preview-info { font-size: 0.9rem; color: #333; line-height: 1.4; }
-        .latest-preview-info span.lbl { font-size: 0.75rem; color: #7f8c8d; font-weight: bold; }
-        
-        table { width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; }
-        th { background: var(--primary); color: white; padding: 12px; text-align: left; font-size: 0.85rem; }
+        /* ★右側：リストエリア（独立スクロールバー） */
+        .list-section { flex: 1; background: white; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); overflow-y: auto; position: relative; }
+        /* スクロールバーのデザイン */
+        .list-section::-webkit-scrollbar { width: 8px; }
+        .list-section::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 8px; }
+        .list-section::-webkit-scrollbar-thumb { background: #bdc3c7; border-radius: 8px; }
+        .list-section::-webkit-scrollbar-thumb:hover { background: #95a5a6; }
+
+        table { width: 100%; border-collapse: collapse; }
+        /* ★見出しを一番上に固定 */
+        th { background: var(--primary); color: white; padding: 12px; text-align: left; font-size: 0.85rem; position: sticky; top: 0; z-index: 10; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
         td { border-bottom: 1px solid #eee; padding: 10px; vertical-align: middle; }
         
+        /* ★新規追加行が光るアニメーション */
+        @keyframes highlightRow { 0% { background-color: #fff3cd; } 100% { background-color: transparent; } }
+        .new-row { animation: highlightRow 1.5s ease-out; }
+
         .thumb-wrap canvas { width: 180px; height: auto; border: 1px solid #ddd; border-radius: 4px; background: #000; }
         .time-code { font-family: 'Courier New', Courier, monospace; font-weight: bold; color: var(--accent); font-size: 1rem; }
         
@@ -50,7 +57,7 @@
         textarea.ocr-error { background-color: #fff0f0; color: #e74c3c; border-left: 4px solid #e74c3c; font-size: 0.8rem; }
         
         @keyframes pulse { 0% { opacity: 0.6; } 50% { opacity: 1; } 100% { opacity: 0.6; } }
-        .no-data { text-align: center; padding: 50px; color: #999; background: white; border-radius: 8px; }
+        .no-data { text-align: center; padding: 50px; color: #999; }
         #status { font-size: 0.85rem; font-weight: bold; margin-top: 10px; text-align: center; padding: 8px; border-radius: 4px; }
         .status-loading { background: #f39c12; color: white; }
         .status-success { background: #27ae60; color: white; }
@@ -60,7 +67,7 @@
 
 <div class="container">
     <header>
-        <h1>🎬 動画確認用カット表作成ツール <span style="font-size: 0.8rem; color: #7f8c8d;">v9.0 (UX改善・プレビュー搭載版)</span></h1>
+        <h1>🎬 動画確認用カット表作成ツール <span style="font-size: 0.8rem; color: #7f8c8d;">v9.1 (UI追従スクロール版)</span></h1>
     </header>
     
     <div class="settings-section">
@@ -83,15 +90,6 @@
                     <button class="btn-pptx" onclick="exportToPPTX()">PowerPoint 📥</button>
                 </div>
             </div>
-            
-            <div id="latestPreviewBox" class="latest-preview">
-                <div class="latest-preview-title">✅ 最新の登録カット</div>
-                <img id="latestImgPreview" src="" alt="preview">
-                <div class="latest-preview-info">
-                    <span class="lbl">タイム:</span> <span id="latestTimePreview" style="font-family: monospace; font-weight: bold; color: var(--accent);"></span><br>
-                    <span class="lbl">テロップ:</span> <span id="latestTelopPreview">✨ AIが解析中...</span>
-                </div>
-            </div>
         </div>
 
         <div class="list-section" id="listContainer">
@@ -101,7 +99,7 @@
                     <tr>
                         <th style="width: 50px;">No.</th>
                         <th style="width: 100px;">タイム</th>
-                        <th style="width: 200px;">画像</th>
+                        <th style="width: 180px;">画像</th>
                         <th>セリフ / テロップ</th>
                         <th style="width: 60px;">操作</th>
                     </tr>
@@ -136,9 +134,6 @@
     let currentObjectUrl = null;
     let recognition = null;
     let activeSpeechId = null;
-    
-    // ★ プレビュー管理用変数
-    let latestCutId = null;
 
     const CDNS = {
         exceljs: ["https://cdn.jsdelivr.net/npm/exceljs@4.3.0/dist/exceljs.min.js"],
@@ -184,12 +179,11 @@
         const fullImgData = canvas.toDataURL('image/jpeg', 0.8);
         const id = Date.now();
         const apiKey = document.getElementById('apiKey').value.trim();
-        const timeStr = formatTime(video.currentTime);
 
         const newItem = {
             id: id, 
             seconds: video.currentTime, 
-            time: timeStr, 
+            time: formatTime(video.currentTime), 
             dialogue: "", 
             telop: apiKey ? "✨ AIが解析中..." : "", 
             img: fullImgData, 
@@ -201,15 +195,19 @@
         cutData.push(newItem); 
         cutData.sort((a, b) => a.seconds - b.seconds);
         
-        // ★ プレビュー画面の更新
-        latestCutId = id;
-        document.getElementById('latestPreviewBox').style.display = 'block';
-        document.getElementById('latestImgPreview').src = fullImgData;
-        document.getElementById('latestTimePreview').innerText = timeStr;
-        document.getElementById('latestTelopPreview').innerText = apiKey ? "✨ AIが解析中..." : "（APIキー未設定）";
-        document.getElementById('latestTelopPreview').style.color = "#3498db";
-        
         renderTable();
+
+        // ★ 自動追従スクロール処理
+        setTimeout(() => {
+            const newRow = document.getElementById(`row-${id}`);
+            if (newRow) {
+                // 行が表示領域の中央に来るようにスクロール
+                newRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                // 光らせるクラスを追加
+                newRow.classList.add('new-row');
+            }
+        }, 50);
+
         if (apiKey) runGeminiAI(id, fullImgData, apiKey);
     }
 
@@ -234,12 +232,10 @@
                 throw new Error(errorMsg);
             }
 
-            // ★ デバッグ1: 「undefined」エラー対策（安全なデータ読み取り）
             let extractedText = "（テロップなし）";
             const parts = data.candidates?.[0]?.content?.parts;
             if (parts && parts.length > 0 && parts[0].text) {
                 const rawText = parts[0].text.trim().replace(/\*\*/g, '');
-                // 空文字列なら「（テロップなし）」にする
                 extractedText = rawText !== "" ? rawText : "（テロップなし）";
             }
 
@@ -249,12 +245,6 @@
                 item.isOcrRunning = false;
                 item.isError = false;
                 renderTable(); 
-                
-                // ★ デバッグ3: 最新のカットIDの時だけプレビューを更新する
-                if (id === latestCutId) {
-                    document.getElementById('latestTelopPreview').innerText = extractedText;
-                    document.getElementById('latestTelopPreview').style.color = "#333";
-                }
             }
         } catch (err) {
             const item = cutData.find(d => d.id === id);
@@ -263,16 +253,10 @@
                 item.isOcrRunning = false; 
                 item.isError = true;
                 renderTable(); 
-                
-                if (id === latestCutId) {
-                    document.getElementById('latestTelopPreview').innerText = "⚠️ 解析エラー（リストをご確認ください）";
-                    document.getElementById('latestTelopPreview').style.color = "#e74c3c";
-                }
             }
         }
     }
 
-    // --- 音声入力、テーブル描画、出力関数などはそのまま ---
     function toggleSpeech(id) {
         if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) return alert("ブラウザ非対応です");
         const btn = document.getElementById(`btn-mic-${id}`);
@@ -309,6 +293,8 @@
         tableBody.innerHTML = "";
         cutData.forEach((item, index) => {
             const row = document.createElement('tr');
+            // ★ スクロール処理のためにIDを付与
+            row.id = `row-${item.id}`;
             
             let telopClass = "";
             if (item.isOcrRunning) telopClass = "ocr-loading";
