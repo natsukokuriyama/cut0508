@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>動画確認用カット表作成ツール v8.9</title>
+    <title>動画確認用カット表作成ツール v9.0</title>
     <style>
         :root { --primary: #2c3e50; --accent: #e74c3c; --bg: #f0f2f5; }
         body { font-family: 'Helvetica Neue', Arial, sans-serif; background: var(--bg); margin: 0; padding: 20px; color: #333; }
@@ -30,6 +30,13 @@
         .btn-xlsx { background: #27ae60; color: white; font-size: 1rem; flex: 1; }
         .btn-pptx { background: #d35400; color: white; font-size: 1rem; flex: 1; }
         
+        /* 最新プレビュー用スタイル */
+        .latest-preview { margin-top: 15px; padding: 12px; border: 2px solid #3498db; border-radius: 8px; background: #f0f7ff; display: none; }
+        .latest-preview-title { font-size: 0.85rem; font-weight: bold; color: #2980b9; margin-bottom: 8px; }
+        .latest-preview img { width: 100%; border-radius: 4px; margin-bottom: 8px; border: 1px solid #bdc3c7; }
+        .latest-preview-info { font-size: 0.9rem; color: #333; line-height: 1.4; }
+        .latest-preview-info span.lbl { font-size: 0.75rem; color: #7f8c8d; font-weight: bold; }
+        
         table { width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; }
         th { background: var(--primary); color: white; padding: 12px; text-align: left; font-size: 0.85rem; }
         td { border-bottom: 1px solid #eee; padding: 10px; vertical-align: middle; }
@@ -53,7 +60,7 @@
 
 <div class="container">
     <header>
-        <h1>🎬 動画確認用カット表作成ツール <span style="font-size: 0.8rem; color: #7f8c8d;">v8.9 (OCR出力完全特化版)</span></h1>
+        <h1>🎬 動画確認用カット表作成ツール <span style="font-size: 0.8rem; color: #7f8c8d;">v9.0 (UX改善・プレビュー搭載版)</span></h1>
     </header>
     
     <div class="settings-section">
@@ -74,6 +81,15 @@
                 <div class="export-group">
                     <button class="btn-xlsx" onclick="exportToExcel()">Excel 📥</button>
                     <button class="btn-pptx" onclick="exportToPPTX()">PowerPoint 📥</button>
+                </div>
+            </div>
+            
+            <div id="latestPreviewBox" class="latest-preview">
+                <div class="latest-preview-title">✅ 最新の登録カット</div>
+                <img id="latestImgPreview" src="" alt="preview">
+                <div class="latest-preview-info">
+                    <span class="lbl">タイム:</span> <span id="latestTimePreview" style="font-family: monospace; font-weight: bold; color: var(--accent);"></span><br>
+                    <span class="lbl">テロップ:</span> <span id="latestTelopPreview">✨ AIが解析中...</span>
                 </div>
             </div>
         </div>
@@ -120,6 +136,9 @@
     let currentObjectUrl = null;
     let recognition = null;
     let activeSpeechId = null;
+    
+    // ★ プレビュー管理用変数
+    let latestCutId = null;
 
     const CDNS = {
         exceljs: ["https://cdn.jsdelivr.net/npm/exceljs@4.3.0/dist/exceljs.min.js"],
@@ -156,7 +175,6 @@
     video.addEventListener('loadedmetadata', () => { video.currentTime = 0.001; });
     video.addEventListener('canplay', () => { statusEl.className = "status-success"; statusEl.innerText = "✅ 準備完了"; });
 
-    // --- キャプチャ ＆ 自動並び替え ---
     function captureFrame() {
         if (!video.src || video.readyState === 0) return alert("動画がありません");
         emptyMsg.style.display = 'none'; cutTable.style.display = 'table';
@@ -166,11 +184,12 @@
         const fullImgData = canvas.toDataURL('image/jpeg', 0.8);
         const id = Date.now();
         const apiKey = document.getElementById('apiKey').value.trim();
+        const timeStr = formatTime(video.currentTime);
 
         const newItem = {
             id: id, 
             seconds: video.currentTime, 
-            time: formatTime(video.currentTime), 
+            time: timeStr, 
             dialogue: "", 
             telop: apiKey ? "✨ AIが解析中..." : "", 
             img: fullImgData, 
@@ -182,26 +201,25 @@
         cutData.push(newItem); 
         cutData.sort((a, b) => a.seconds - b.seconds);
         
+        // ★ プレビュー画面の更新
+        latestCutId = id;
+        document.getElementById('latestPreviewBox').style.display = 'block';
+        document.getElementById('latestImgPreview').src = fullImgData;
+        document.getElementById('latestTimePreview').innerText = timeStr;
+        document.getElementById('latestTelopPreview').innerText = apiKey ? "✨ AIが解析中..." : "（APIキー未設定）";
+        document.getElementById('latestTelopPreview').style.color = "#3498db";
+        
         renderTable();
         if (apiKey) runGeminiAI(id, fullImgData, apiKey);
     }
 
-    // --- ✨ Gemini API 処理 ---
     async function runGeminiAI(id, base64Image, apiKey) {
         try {
             const imageData = base64Image.split(',')[1];
             const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
             
-            // ★プロンプト（AIへの指示）を、OCRプログラム専用の超厳格なものに書き換え！
-            const promptText = `あなたは優秀なOCR（光学文字認識）プログラムです。与えられた画像に写っている「テロップ（文字）」のみを抽出し、そのテキストだけを出力してください。
-
-【厳守事項】
-- 前置き、解説、挨拶は一切不要です。
-- 「画像内の文字は〜です」のような説明的な返答は厳禁です。
-- Markdown（**など）は使用しないでください。
-- **出力全体を、抽出したテキストそのものにしてください。**
-- 抽出したテキスト以外は、空白を含め一切出力しないでください。
-- 画像に文字がない場合は、空文字列（何も出力しない）を返してください。`;
+            const promptText = `あなたは優秀なOCRプログラムです。画像内の「テロップ（文字）」のみを抽出し、そのテキストだけを出力してください。
+【厳守】前置き、説明、Markdownは一切禁止。画像に文字がない場合は空文字列を返してください。`;
 
             const response = await fetch(url, {
                 method: 'POST',
@@ -216,14 +234,27 @@
                 throw new Error(errorMsg);
             }
 
-            // AIの出力から、さらに念のため前後の空白を削除
-            const text = data.candidates[0].content.parts[0].text.trim().replace(/\*\*/g, ''); // **も念のため削除
+            // ★ デバッグ1: 「undefined」エラー対策（安全なデータ読み取り）
+            let extractedText = "（テロップなし）";
+            const parts = data.candidates?.[0]?.content?.parts;
+            if (parts && parts.length > 0 && parts[0].text) {
+                const rawText = parts[0].text.trim().replace(/\*\*/g, '');
+                // 空文字列なら「（テロップなし）」にする
+                extractedText = rawText !== "" ? rawText : "（テロップなし）";
+            }
+
             const item = cutData.find(d => d.id === id);
             if (item) {
-                item.telop = text || "（文字なし）"; 
+                item.telop = extractedText; 
                 item.isOcrRunning = false;
                 item.isError = false;
                 renderTable(); 
+                
+                // ★ デバッグ3: 最新のカットIDの時だけプレビューを更新する
+                if (id === latestCutId) {
+                    document.getElementById('latestTelopPreview').innerText = extractedText;
+                    document.getElementById('latestTelopPreview').style.color = "#333";
+                }
             }
         } catch (err) {
             const item = cutData.find(d => d.id === id);
@@ -232,11 +263,16 @@
                 item.isOcrRunning = false; 
                 item.isError = true;
                 renderTable(); 
+                
+                if (id === latestCutId) {
+                    document.getElementById('latestTelopPreview').innerText = "⚠️ 解析エラー（リストをご確認ください）";
+                    document.getElementById('latestTelopPreview').style.color = "#e74c3c";
+                }
             }
         }
     }
 
-    // --- 🎤 音声認識 ---
+    // --- 音声入力、テーブル描画、出力関数などはそのまま ---
     function toggleSpeech(id) {
         if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) return alert("ブラウザ非対応です");
         const btn = document.getElementById(`btn-mic-${id}`);
@@ -269,7 +305,6 @@
         if (activeSpeechId === id) { activeSpeechId = null; recognition = null; }
     }
 
-    // --- テーブル描画 ---
     function renderTable() {
         tableBody.innerHTML = "";
         cutData.forEach((item, index) => {
