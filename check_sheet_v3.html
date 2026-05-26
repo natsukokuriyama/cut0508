@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>動画確認用カット表作成ツール v8.6</title>
+    <title>動画確認用カット表作成ツール v8.7</title>
     <style>
         :root { --primary: #2c3e50; --accent: #e74c3c; --bg: #f0f2f5; }
         body { font-family: 'Helvetica Neue', Arial, sans-serif; background: var(--bg); margin: 0; padding: 20px; color: #333; }
@@ -53,7 +53,7 @@
 
 <div class="container">
     <header>
-        <h1>🎬 動画確認用カット表作成ツール <span style="font-size: 0.8rem; color: #7f8c8d;">v8.6 (AIモデル最新版)</span></h1>
+        <h1>🎬 動画確認用カット表作成ツール <span style="font-size: 0.8rem; color: #7f8c8d;">v8.7 (無料対応2.5モデル版)</span></h1>
     </header>
     
     <div class="settings-section">
@@ -169,7 +169,7 @@
 
         const newItem = {
             id: id, 
-            seconds: video.currentTime, // 秒数でソートするための隠しデータ
+            seconds: video.currentTime, 
             time: formatTime(video.currentTime), 
             dialogue: "", 
             telop: apiKey ? "✨ AIが解析中..." : "", 
@@ -186,12 +186,12 @@
         if (apiKey) runGeminiAI(id, fullImgData, apiKey);
     }
 
-    // --- ✨ Gemini API 処理 (モデル名を最新の2.0に修正！) ---
+    // --- ✨ Gemini API 処理 (モデル名を「gemini-2.5-flash」に変更) ---
     async function runGeminiAI(id, base64Image, apiKey) {
         try {
             const imageData = base64Image.split(',')[1];
-            // ★ここを最新で確実な「gemini-2.0-flash」に変更しました！
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+            // ★無料枠で動く最新モデル「gemini-2.5-flash」を指定
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
             const response = await fetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
